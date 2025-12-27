@@ -1,32 +1,43 @@
-FROM python:3.11
-
-# Install Terraform
-RUN apt-get update && \
-    apt-get install -y wget unzip && \
-    wget https://releases.hashicorp.com/terraform/1.7.0/terraform_1.7.0_linux_amd64.zip && \
-    unzip terraform_1.7.0_linux_amd64.zip && \
-    mv terraform /usr/local/bin/ && \
-    rm terraform_1.7.0_linux_amd64.zip && \
-    terraform --version && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Multi-stage build for smallest image
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
-# Copy requirements
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc g++ && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy and build Python packages
 COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt && \
+    pip wheel --no-cache-dir --wheel-dir /app/wheels google-genai
 
-# Upgrade pip
-RUN pip install --upgrade pip
+# Final stage
+FROM python:3.11-slim
 
-RUN pip install google-genai
+WORKDIR /app
 
+# Install only runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends wget unzip && \
+    wget -q https://releases.hashicorp.com/terraform/1.7.0/terraform_1.7.0_linux_amd64.zip && \
+    unzip -q terraform_1.7.0_linux_amd64.zip && \
+    mv terraform /usr/local/bin/ && \
+    rm terraform_1.7.0_linux_amd64.zip && \
+    apt-get purge -y wget unzip && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
+# Copy pre-built wheels from builder
+COPY --from=builder /app/wheels /wheels
 
-# Install Python packages
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python packages from wheels
+RUN pip install --no-cache-dir /wheels/* && \
+    rm -rf /wheels
 
-# Copy application code
+# Copy application
 COPY . .
 
 EXPOSE 8000
