@@ -1,43 +1,32 @@
-# Multi-stage build for smallest image
-FROM python:3.11-slim as builder
+FROM python:3.11
 
-WORKDIR /app
-
-# Install build dependencies
+# Install Terraform
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc g++ && \
-    rm -rf /var/lib/apt/lists/*
-
-# Copy and build Python packages
-COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt && \
-    pip wheel --no-cache-dir --wheel-dir /app/wheels google-genai
-
-# Final stage
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Install only runtime dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends wget unzip && \
-    wget -q https://releases.hashicorp.com/terraform/1.7.0/terraform_1.7.0_linux_amd64.zip && \
-    unzip -q terraform_1.7.0_linux_amd64.zip && \
+    apt-get install -y wget unzip && \
+    wget https://releases.hashicorp.com/terraform/1.7.0/terraform_1.7.0_linux_amd64.zip && \
+    unzip terraform_1.7.0_linux_amd64.zip && \
     mv terraform /usr/local/bin/ && \
     rm terraform_1.7.0_linux_amd64.zip && \
-    apt-get purge -y wget unzip && \
-    apt-get autoremove -y && \
+    terraform --version && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy pre-built wheels from builder
-COPY --from=builder /app/wheels /wheels
+WORKDIR /app
 
-# Install Python packages from wheels
-RUN pip install --no-cache-dir /wheels/* && \
-    rm -rf /wheels
+# Copy requirements
+COPY requirements.txt .
 
-# Copy application
+# Upgrade pip
+RUN pip install --upgrade pip
+
+RUN pip install google-genai
+
+
+
+# Install Python packages
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
 COPY . .
 
 EXPOSE 8000
