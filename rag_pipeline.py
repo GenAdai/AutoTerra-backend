@@ -377,7 +377,7 @@ def hf_inference(text:str)-> list[float]:
     "sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction"
 )
     HEADERS = {
-    "Authorization": f"Bearer {os.environ['HF_TOKEN']}",
+    "Authorization": f"Bearer {os.environ['HUGGINGFACE_API_KEY']}",
     "Content-Type": "application/json",
 }
     response = requests.post(hf_api_url,
