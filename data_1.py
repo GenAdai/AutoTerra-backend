@@ -21,7 +21,33 @@ def batch(iterable,size):
         yield(iterable[i:i+size])
 
 
+def chuck_text(text:str,chunk_size:int=1000,overlap :int=100):
+    """
+    Docstring for chuck_text
+    
+    :param text: Description
+    :type text: str
+    :param chunk: Description
+    :type chunk: int
+    :param overlap: Description
+    :type overlap: int
+    """
+    
+    chunks = []
+    start = 0 
+    text_end = len(text)
 
+    while start<text_end:
+        end = min(start+chunk_size,text_end)
+        last_space = text.rfind(" ",start,end)
+
+        if last_space!=-1 and last_space>start+chunk_size//2:
+            chunks.append(text[start:end].strip())
+        
+        start = max(end-overlap,end)
+
+
+    return chunks 
 
 
 def Pinecone_embedding(content):
@@ -43,14 +69,15 @@ def Pinecone_embedding(content):
         }
     )
     dense_index = pc.Index(INDEX_NAME)
-    BATCH_SIZE = 50
-
+ 
+    BATCH_SIZE= 10 
     for chunk in batch(content,BATCH_SIZE):
-        print(chunk)
-        break
-        # dense_index.upsert_records(
-        #                         namespace="example-namespace", 
-        #                            records=chunk)
+    #     print(chunk)
+        dense_index.upsert_records(
+                                namespace="example-namespace", 
+                                   records=chunk)
+        
+    pass
 
 
 
@@ -80,11 +107,14 @@ def embed_and_upload(DOCS_FOLDER:str):
     for i,file in enumerate(all_files):
         with file.open('r', encoding='utf-8') as file_handle:
             id= str(file)
-            content = {"_id":id[49:],
-                       "chunk_text":file_handle.read()}
+            chucks = chuck_text(file_handle.read())
+            for i,chuck in enumerate(chucks):
+                content = {"_id":id[49:],
+                       "chunk_text":chuck,
+                       "chunk_id":i}
             
             All_data_from_file.append(content)
-    
+ 
 
     Pinecone_embedding(All_data_from_file)
 
